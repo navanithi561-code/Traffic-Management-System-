@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traffic Management Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#0a1128;--card:#111c3a;--card2:#16244a;--line:#243460;--tx:#e6edf9;--mut:#8b9bc4;--cy:#22d3ee;--bl:#3b82f6;--gr:#22c55e;--or:#f59e0b;--rd:#ef4444}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 80% -10%,#15275a 0,var(--bg) 60%);color:var(--tx);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif;min-height:100vh}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);background:#0b1431cc;backdrop-filter:blur(8px);position:sticky;top:0;z-index:5}
+h1{margin:0;font-size:20px}h1 span{color:var(--cy)}.sub{color:var(--mut);font-size:13px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;background:var(--card2);font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--rd)}.dot.on{background:var(--gr);box-shadow:0 0 8px var(--gr)}
+button,select{font:inherit;color:var(--tx);background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer;transition:.15s}
+button:hover:not(:disabled){transform:translateY(-1px);border-color:var(--cy)}button:disabled{opacity:.55;cursor:wait}
+.b-go{background:var(--gr);border-color:var(--gr);color:#04210f;font-weight:600}.b-pause{background:var(--or);border-color:var(--or);color:#2a1700;font-weight:600}.b-stop{background:var(--rd);border-color:var(--rd);font-weight:600}.b-cy{background:var(--cy);border-color:var(--cy);color:#03232b;font-weight:600}
+button.loading::after{content:"";display:inline-block;width:10px;height:10px;margin-left:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .7s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}
+nav{display:flex;gap:6px;overflow-x:auto;padding:10px 20px}nav button{white-space:nowrap;background:transparent;border-color:transparent;color:var(--mut)}nav button.act{background:var(--card2);color:var(--cy);border-color:var(--line)}
+main{padding:8px 20px 40px;max-width:1200px;margin:auto}section{display:none}section.act{display:block;animation:fade .3s}@keyframes fade{from{opacity:0;transform:translateY(6px)}}
+.grid{display:grid;gap:14px}.g6{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 8px 24px #0006;transition:.2s}.card:hover{border-color:#34508f}
+.stat .v{font-size:28px;font-weight:700}.stat .l{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.06em}.c1 .v{color:var(--cy)}.c2 .v{color:var(--gr)}.c3 .v{color:var(--rd)}.c4 .v{color:var(--bl)}.c5 .v{color:var(--or)}
+h3{margin:0 0 10px;font-size:16px}.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.mut{color:var(--mut);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--mut);font-weight:500}
+.dir{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}.sig{width:14px;height:14px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+.red{background:var(--rd);box-shadow:0 0 10px var(--rd)}.yellow{background:var(--or);box-shadow:0 0 10px var(--or)}.green{background:var(--gr);box-shadow:0 0 10px var(--gr)}
+svg{width:100%;height:auto;display:block}.em{animation:pulse .8s infinite alternate}@keyframes pulse{to{opacity:.35}}
+#toasts{position:fixed;right:14px;bottom:14px;display:grid;gap:8px;z-index:20}.toast{padding:10px 14px;border-radius:10px;background:var(--card2);border-left:4px solid var(--gr);box-shadow:0 6px 20px #000a;animation:fade .25s}.toast.err{border-color:var(--rd)}
+#offline{display:none;background:var(--rd);padding:8px 20px;text-align:center;font-weight:600}
+.chart{position:relative;height:240px}p{margin:.4em 0}code{background:var(--card2);padding:1px 6px;border-radius:6px}
+</style>
+</head>
+<body>
+<div id="offline">Backend not reachable. Start traffic_server and keep this page open - it reconnects automatically.</div>
+<header>
+  <div><h1>🚦 <span>Traffic Management</span> Simulator</h1><div class="sub">DSA-Powered Smart Traffic Control</div></div>
+  <div class="row">
+    <span class="pill"><span class="dot" id="dot"></span><span id="sysStatus">connecting…</span></span>
+    <button class="b-go" id="bStart">▶ Start</button><button class="b-pause" id="bPause">⏸ Pause</button><button class="b-stop" id="bReset">⟲ Reset</button>
+    <select id="speed" title="Simulation speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select>
+  </div>
+</header>
+<nav id="tabs"></nav>
+<main>
+<section id="t-dashboard" class="act">
+  <div class="grid g6" id="stats"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Signal summary</h3><div id="sigSummary"></div></div>
+    <div class="card"><h3>Fairness policy</h3>
+      <p class="mut"><b>Emergency priority:</b> emergency vehicles sit in a binary max-heap (priority 5→1, then earliest arrival, then lowest ID). When one is waiting on a red approach, the controller ends the current green early and gives that approach the next green.</p>
+      <p class="mut"><b>Fairness:</b> emergency preemption is capped at 2 consecutive phases. After that the signal rotates to whichever approach has waiting vehicles, so normal FIFO traffic cannot starve.</p></div>
+  </div>
+</section>
+
+<section id="t-live">
+  <div class="grid g2">
+    <div class="card"><h3>Intersection <span class="mut" id="phaseInfo"></span></h3><svg viewBox="0 0 400 400" id="junction"></svg></div>
+    <div class="grid">
+      <div class="card"><h3>Add vehicle</h3><div class="row">
+        <select id="vType"><option value="car">Car</option><option value="bike">Bike</option><option value="bus">Bus</option><option value="truck">Truck</option><option value="ambulance">Ambulance</option><option value="fire_engine">Fire Engine</option><option value="police">Police Vehicle</option></select>
+        <select id="vDir"><option value="north">North</option><option value="south">South</option><option value="east">East</option><option value="west">West</option></select>
+        <button class="b-cy" id="bAdd">Add</button><button id="bProc">Process next</button></div></div>
+      <div class="card"><h3>Directions</h3><div id="dirList"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="t-emergency">
+  <div class="grid g2">
+    <div class="card"><h3>Add emergency vehicle</h3><div class="row">
+      <select id="eType"><option value="ambulance">Ambulance</option><option value="fire_engine">Fire Engine</option><option value="police">Police Vehicle</option></select>
+      <select id="eDir"><option value="north">North</option><option value="south">South</option><option value="east">East</option><option value="west">West</option></select>
+      <select id="ePri"><option value="0">Default priority</option><option value="5">Priority 5 (highest)</option><option value="4">Priority 4</option><option value="3">Priority 3</option><option value="2">Priority 2</option><option value="1">Priority 1</option></select>
+      <button class="b-cy" id="bEm">Add</button></div>
+      <p class="mut">Defaults: ambulance 5, fire engine 4, police 3. Ties → earlier arrival → lower ID.</p></div>
+    <div class="card"><h3>Next to be processed</h3><div id="emNext" class="stat"></div></div>
+  </div>
+  <div class="card" style="margin-top:14px;overflow-x:auto"><h3>Waiting emergency vehicles</h3><table><thead><tr><th>#</th><th>ID</th><th>Type</th><th>Direction</th><th>Priority</th><th>Waiting (ticks)</th></tr></thead><tbody id="emRows"></tbody></table></div>
+</section>
+
+<section id="t-routes">
+  <div class="card"><div class="row"><select id="rFrom"></select><span>→</span><select id="rTo"></select>
+    <button class="b-cy" id="bDij">Find Shortest Route</button><button id="bBfs">Find Fewest-Connections Route</button></div>
+    <div id="routeOut" class="mut" style="margin-top:10px">Pick two intersections.</div></div>
+  <div class="card" style="margin-top:14px"><svg viewBox="0 0 620 440" id="netsvg"></svg></div>
+  <div class="card" style="margin-top:14px"><p class="mut"><b>BFS</b> minimises the <i>number of roads</i> and ignores distances. <b>Dijkstra</b> (min-heap) minimises the <i>total distance</i>. Try A → H: they give different routes.</p></div>
+</section>
+
+<section id="t-analytics">
+  <div class="grid g6" id="aStats"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Vehicles processed over time</h3><div class="chart"><canvas id="ch1"></canvas></div></div>
+    <div class="card"><h3>Vehicles by type</h3><div class="chart"><canvas id="ch2"></canvas></div></div>
+    <div class="card"><h3>Queue length by direction</h3><div class="chart"><canvas id="ch3"></canvas></div></div>
+    <div class="card"><h3>Normal vs emergency (processed)</h3><div class="chart"><canvas id="ch4"></canvas></div></div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Metric definitions</h3><p class="mut">All numbers come from the C backend. Time is <b>simulated</b>: 1 tick = 1 simulated second at 1x. <b>Average waiting time</b> = total ticks between a vehicle being added and crossing ÷ vehicles processed. <b>Throughput</b> = processed vehicles per 60 simulated ticks. <b>Max queue</b> = largest single-direction queue seen. <b>Active intersections</b> = road-network intersections while the simulation is running.</p></div>
+</section>
+
+<section id="t-about">
+  <div class="card"><h3>About</h3>
+    <p class="mut">A college DSA project. The backend is written in C: linked-list FIFO queues (normal vehicles), a binary max-heap (emergency vehicles), an adjacency-list graph, BFS and Dijkstra with a binary min-heap. This page only displays what the REST API returns - no algorithm runs in JavaScript.</p>
+    <p class="mut">Endpoints: <code>/api/health</code> <code>/api/dashboard</code> <code>/api/traffic</code> <code>/api/vehicles</code> <code>/api/emergency</code> <code>/api/routes/bfs</code> <code>/api/routes/shortest</code> <code>/api/analytics</code> …</p></div>
+</section>
+</main>
+<div id="toasts"></div>
+<script>
+const API = location.protocol.startsWith('http') ? '' : 'http://localhost:8080';
+const $ = s => document.querySelector(s);
+const cap = s => s.replace('_',' ').replace(/^./, c => c.toUpperCase());
+const COL = {car:'#38bdf8',bike:'#a3e635',bus:'#fbbf24',truck:'#a78bfa',ambulance:'#ef4444',fire_engine:'#f97316',police:'#3b82f6'};
+const POS = {A:[70,90],B:[230,50],C:[70,260],D:[290,170],E:[170,390],F:[420,300],G:[470,100],H:[570,230]};
+let net = null, routeHi = [], online = false, polling = false, charts = {};
+
+function toast(msg, err){ const t=document.createElement('div'); t.className='toast'+(err?' err':''); t.textContent=msg; $('#toasts').appendChild(t); setTimeout(()=>t.remove(),3200); }
+async function api(path, opt){
+  const r = await fetch(API+path, opt); let j;
+  try { j = await r.json(); } catch { throw new Error('Invalid response from server'); }
+  if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP '+r.status));
+  return j;
+}
+const post = (p,b) => api(p,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})});
+async function act(btn, fn, okMsg){
+  if (btn.disabled) return; btn.disabled = true; btn.classList.add('loading');
+  try { await fn(); if (okMsg) toast(okMsg); } catch(e){ toast(e.name==='TypeError' ? 'Backend unreachable' : e.message, true); }
+  finally { btn.disabled=false; btn.classList.remove('loading'); refresh(); }
+}
+
+/* tabs */
+const TABS=[['dashboard','Dashboard'],['live','Live Traffic'],['emergency','Emergency Vehicles'],['routes','Route Finder'],['analytics','Analytics'],['about','About Project']];
+$('#tabs').innerHTML = TABS.map(([k,n])=>`<button data-k="${k}">${n}</button>`).join('');
+$('#tabs').onclick = e => { const k=e.target.dataset.k; if(!k)return;
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('act',b.dataset.k===k));
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('act',s.id==='t-'+k)); };
+document.querySelector('nav button').classList.add('act');
+
+/* controls */
+$('#bStart').onclick = e => act(e.currentTarget, ()=>post('/api/simulation/start'), 'Simulation running');
+$('#bPause').onclick = e => act(e.currentTarget, ()=>post('/api/simulation/pause'), 'Simulation paused');
+$('#bReset').onclick = e => act(e.currentTarget, ()=>post('/api/simulation/reset'), 'Simulation reset');
+$('#speed').onchange = e => post('/api/simulation/speed',{speed:+e.target.value}).then(()=>toast('Speed '+e.target.value+'x')).catch(x=>toast(x.message,true));
+$('#bAdd').onclick = e => act(e.currentTarget, async()=>{ const r=await post('/api/vehicles',{type:$('#vType').value,direction:$('#vDir').value}); toast(`${cap(r.vehicle.type)} #${r.vehicle.id} added (${r.vehicle.direction})`); });
+$('#bProc').onclick = e => act(e.currentTarget, async()=>{ const r=await post('/api/traffic/process'); toast(`Processed ${cap(r.processed.type)} #${r.processed.id}`); });
+$('#bEm').onclick = e => act(e.currentTarget, async()=>{ const b={type:$('#eType').value,direction:$('#eDir').value}; const p=+$('#ePri').value; if(p) b.priority=p;
+  const r=await post('/api/emergency',b); toast(`${cap(r.vehicle.type)} #${r.vehicle.id} added, priority ${r.vehicle.priority}`); });
+$('#bDij').onclick = e => findRoute(e.currentTarget,'shortest');
+$('#bBfs').onclick = e => findRoute(e.currentTarget,'bfs');
+function findRoute(btn, kind){ act(btn, async()=>{
+  const f=$('#rFrom').value,t=$('#rTo').value;
+  try { const r=await api(`/api/routes/${kind}?from=${f}&to=${t}`); routeHi=r.path;
+    $('#routeOut').innerHTML = `<b>${kind==='bfs'?'Fewest connections (BFS)':'Shortest distance (Dijkstra)'}:</b> ${r.names.map((n,i)=>r.path[i]+' ('+n+')').join(' → ')}<br>Roads: <b>${r.edges}</b> · Total distance: <b>${r.distance}</b> units`; drawNet(); }
+  catch(e){ routeHi=[]; drawNet(); $('#routeOut').textContent='⚠ '+e.message; throw e; } }); }
+
+/* rendering */
+function stat(cls,l,v){ return `<div class="card stat ${cls}"><div class="l">${l}</div><div class="v">${v}</div></div>`; }
+function renderDash(d){
+  $('#stats').innerHTML = stat('c1','Total vehicles',d.total_vehicles)+stat('c2','Processed',d.vehicles_processed)+stat('c3','Emergency waiting',d.emergency_waiting)
+   +stat('c4','Active intersections',d.active_intersections)+stat('c5','Avg wait (ticks)',d.avg_wait.toFixed(2))+stat('c1','Status',d.status.toUpperCase());
+  $('#sysStatus').textContent = 'Simulation '+d.status; $('#speed').value = d.speed;
+  $('#bStart').textContent = d.status==='paused' ? '▶ Resume' : '▶ Start';
+}
+function renderTraffic(t){
+  $('#phaseInfo').textContent = `· ${t.phase} ${t.light} (${t.timer}s) · tick ${t.sim_time}`;
+  $('#sigSummary').innerHTML = t.directions.map(d=>`<div class="dir"><span><span class="sig ${d.signal}"></span>${cap(d.name)}</span><span class="mut">${d.signal.toUpperCase()} · ${d.waiting_normal+d.waiting_emergency} waiting</span></div>`).join('')+`<p class="mut">Conflict-free signals: <b>${t.conflict_free?'yes':'NO'}</b></p>`;
+  $('#dirList').innerHTML = t.directions.map(d=>`<div class="dir"><span><span class="sig ${d.signal}"></span><b>${cap(d.name)}</b> <span class="mut">${d.signal==='red'?'':'duration '+(d.signal==='green'?t.green_len:'2')+'s, '}${d.waiting_normal} normal / ${d.waiting_emergency} emergency</span></span><span class="mut">${d.passing?'passing: '+cap(d.passing.type)+' #'+d.passing.id:'—'}</span></div>`).join('');
+  drawJunction(t);
+}
+function veh(x,y,w,h,v,key){ return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${COL[v.type]}" class="${v.priority?'em':''}"><title>${cap(v.type)} #${v.id}</title></rect>`; }
+function drawJunction(t){
+  let s='<rect width="400" height="400" fill="#0d1733"/><rect x="160" y="0" width="80" height="400" fill="#1f2a4d"/><rect x="0" y="160" width="400" height="80" fill="#1f2a4d"/><line x1="200" y1="0" x2="200" y2="160" stroke="#445" stroke-dasharray="8 8"/><line x1="200" y1="240" x2="200" y2="400" stroke="#445" stroke-dasharray="8 8"/><line x1="0" y1="200" x2="160" y2="200" stroke="#445" stroke-dasharray="8 8"/><line x1="240" y1="200" x2="400" y2="200" stroke="#445" stroke-dasharray="8 8"/>';
+  const C={red:'#ef4444',yellow:'#f59e0b',green:'#22c55e'};
+  t.directions.forEach((d,i)=>{ const q=d.queue.slice(0,7), extra=d.waiting_normal+d.waiting_emergency-q.length;
+    q.forEach((v,k)=>{ const o=k*24;
+      if(i===0) s+=veh(170,130-o,24,18,v); if(i===1) s+=veh(206,252+o,24,18,v);
+      if(i===2) s+=veh(252+o,170,18,24,v); if(i===3) s+=veh(130-o,206,18,24,v); });
+    const sx=[150,250,250,150][i], sy=[150,250,150,250][i];
+    s+=`<circle cx="${sx}" cy="${sy}" r="9" fill="${C[d.signal]}"><title>${cap(d.name)} ${d.signal}</title></circle>`;
+    const lx=[200,200,375,25][i], ly=[14,392,198,198][i];
+    s+=`<text x="${lx}" y="${ly}" fill="#8b9bc4" font-size="12" text-anchor="middle">${cap(d.name)} · ${d.waiting_normal+d.waiting_emergency}${extra>0?' (+'+extra+')':''}</text>`;
+    if(d.passing){ const px=[185,215,200,200][i], py=[200,200,185,215][i]; s+=`<circle cx="${px}" cy="${py}" r="6" fill="${COL[d.passing.type]}" stroke="#fff"/>`; } });
+  $('#junction').innerHTML=s;
+}
+function renderEmergency(e){
+  $('#emNext').innerHTML = e.next ? `<div class="l">Next</div><div class="v" style="color:var(--rd)">${cap(e.next.type)} #${e.next.id}</div><div class="mut">${cap(e.next.direction)} · priority ${e.next.priority}</div>` : '<div class="mut">No emergency vehicles waiting.</div>';
+  $('#emRows').innerHTML = e.vehicles.length ? e.vehicles.map((v,i)=>`<tr><td>${i+1}</td><td>#${v.id}</td><td>${cap(v.type)}</td><td>${cap(v.direction)}</td><td>${v.priority}</td><td>${v.wait}</td></tr>`).join('') : '<tr><td colspan="6" class="mut">Queue empty</td></tr>';
+}
+function mkChart(id,type,labels,data,colors,opts){ const el=$('#'+id); if(typeof Chart==='undefined'){ el.parentElement.textContent='Chart.js failed to load (check internet).'; return; }
+  if(charts[id]){ const c=charts[id]; c.data.labels=labels; c.data.datasets[0].data=data; c.update('none'); return; }
+  charts[id]=new Chart(el,{type,data:{labels,datasets:[{data,backgroundColor:colors,borderColor:colors,tension:.3,fill:type==='line'}]},options:Object.assign({responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:type==='doughnut',labels:{color:'#e6edf9'}}},scales:type==='doughnut'?{}:{x:{ticks:{color:'#8b9bc4'}},y:{beginAtZero:true,ticks:{color:'#8b9bc4',precision:0}}}},opts||{})}); }
+function renderAnalytics(a){
+  $('#aStats').innerHTML = stat('c1','Vehicles added',a.total_added)+stat('c2','Processed',a.processed)+stat('c3','Emergency processed',a.emergency_processed)+stat('c5','Avg wait (ticks)',a.avg_wait.toFixed(2))
+   +stat('c4','Max queue',a.max_queue)+stat('c2','Throughput / 60 ticks',a.throughput_per_min.toFixed(2))+stat('c1','Active intersections',a.active_intersections)+stat('c4','Waiting',Object.values(a.waiting).reduce((x,y)=>x+y,0));
+  mkChart('ch1','line',a.history.t,a.history.processed,'#22d3ee');
+  mkChart('ch2','bar',Object.keys(a.added_by_type).map(cap),Object.values(a.added_by_type),Object.keys(a.added_by_type).map(k=>COL[k]));
+  mkChart('ch3','bar',Object.keys(a.waiting).map(cap),Object.values(a.waiting),['#3b82f6','#22d3ee','#22c55e','#f59e0b']);
+  mkChart('ch4','doughnut',['Normal','Emergency'],[a.normal_processed,a.emergency_processed],['#3b82f6','#ef4444']);
+}
+function drawNet(){
+  if(!net) return; const hi=new Set(); for(let i=0;i<routeHi.length-1;i++){ hi.add(routeHi[i]+routeHi[i+1]); hi.add(routeHi[i+1]+routeHi[i]); }
+  let s=''; net.edges.forEach(e=>{ const [x1,y1]=POS[e.from],[x2,y2]=POS[e.to], on=hi.has(e.from+e.to);
+    s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${on?'#22d3ee':'#3a4a7a'}" stroke-width="${on?6:3}" stroke-linecap="round"/><text x="${(x1+x2)/2}" y="${(y1+y2)/2-6}" fill="#8b9bc4" font-size="12" text-anchor="middle">${e.distance}</text>`; });
+  net.nodes.forEach(n=>{ const [x,y]=POS[n.id], on=routeHi.includes(n.id);
+    s+=`<circle cx="${x}" cy="${y}" r="20" fill="${on?'#22d3ee':'#16244a'}" stroke="#3b82f6" stroke-width="2"/><text x="${x}" y="${y+5}" text-anchor="middle" font-weight="700" fill="${on?'#03232b':'#e6edf9'}">${n.id}</text><text x="${x}" y="${y+38}" text-anchor="middle" font-size="11" fill="#8b9bc4">${n.label}</text>`; });
+  $('#netsvg').innerHTML=s;
+}
+async function loadNet(){ try{ net=await api('/api/network'); const o=net.nodes.map(n=>`<option value="${n.id}">${n.id} - ${n.label}</option>`).join('');
+  $('#rFrom').innerHTML=o; $('#rTo').innerHTML=o; $('#rTo').value=net.nodes[net.nodes.length-1].id; drawNet(); }catch{} }
+
+async function refresh(){
+  if(polling) return; polling=true;
+  try{
+    const [d,t,e,a]=await Promise.all([api('/api/dashboard'),api('/api/traffic'),api('/api/emergency'),api('/api/analytics')]);
+    if(!online){ online=true; $('#offline').style.display='none'; $('#dot').classList.add('on'); if(!net) loadNet(); }
+    renderDash(d); renderTraffic(t); renderEmergency(e); renderAnalytics(a);
+  }catch(err){ online=false; $('#offline').style.display='block'; $('#dot').classList.remove('on'); $('#sysStatus').textContent='backend offline'; }
+  finally{ polling=false; }
+}
+refresh(); setInterval(refresh,1000);
+</script>
+</body>
+</html>
